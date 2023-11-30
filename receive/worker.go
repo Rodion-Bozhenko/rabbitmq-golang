@@ -2,8 +2,10 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"log"
+	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -18,8 +20,8 @@ func main() {
 	defer ch.Close()
 
 	q, err := ch.QueueDeclare(
-		"hello",
-		false,
+		"task_queue",
+		true,
 		false,
 		false,
 		false,
@@ -27,10 +29,13 @@ func main() {
 	)
 	failOnError(err, "Failed to declare a queue")
 
+	err = ch.Qos(1, 0, false)
+	failOnError(err, "Failed to setQoS")
+
 	msgs, err := ch.Consume(
 		q.Name,
 		"",
-		true,
+		false,
 		false,
 		false,
 		false,
@@ -43,6 +48,11 @@ func main() {
 	go func() {
 		for d := range msgs {
 			log.Printf("Received a message: %s", d.Body)
+			dotCount := bytes.Count(d.Body, []byte("."))
+			t := time.Duration(dotCount)
+			time.Sleep(t * time.Second)
+			log.Printf("Done after %d seconds", t)
+			d.Ack(false)
 		}
 	}()
 
